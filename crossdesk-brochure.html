@@ -1,0 +1,457 @@
+<title>CrossDesk — 맥과 윈도우를 잇는 원격 제어</title>
+<style>
+  /* 앱의 디자인 토큰(design/foundation/colors.html)에서 가져온 팔레트.
+     중성색은 순회색 대신 accent 쪽으로 살짝 기울였다. */
+  :root {
+    --ground: #f4f6f5;
+    --surface: #ffffff;
+    --surface-2: #eef1f0;
+    --line: #d5dbd8;
+    --ink: #1b201e;
+    --muted: #66706c;
+    --accent: #14966b;
+    --accent-deep: #0c6047;
+    --tint: #d9f0e6;
+    --warn: #b25e00;
+    --shadow: 0 1px 2px rgba(16, 32, 26, .06), 0 8px 24px rgba(16, 32, 26, .06);
+    --radius: 14px;
+    --measure: 62ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1512;
+      --surface: #161d1a;
+      --surface-2: #1d2622;
+      --line: #2b3733;
+      --ink: #e6ecea;
+      --muted: #97a29d;
+      --accent: #3fc898;
+      --accent-deep: #7fe0bd;
+      --tint: #17332a;
+      --warn: #e0a260;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 28px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f1512;
+    --surface: #161d1a;
+    --surface-2: #1d2622;
+    --line: #2b3733;
+    --ink: #e6ecea;
+    --muted: #97a29d;
+    --accent: #3fc898;
+    --accent-deep: #7fe0bd;
+    --tint: #17332a;
+    --warn: #e0a260;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 28px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard,
+                 "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: .92em;
+  }
+
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------------------------------------------------------- 헤더 --- */
+
+  header.top {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 28px 0 0;
+  }
+  .brand { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .brand .mark { color: var(--accent); }
+  .top .meta { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+  /* ---------------------------------------------------------- 히어로 --- */
+
+  .hero { padding: 56px 0 8px; }
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    margin: 14px 0 0;
+    font-size: clamp(30px, 5.2vw, 50px);
+    line-height: 1.18;
+    letter-spacing: -.025em;
+    font-weight: 750;
+    text-wrap: balance;
+    max-width: 18ch;
+  }
+  .lede {
+    margin: 18px 0 0;
+    max-width: var(--measure);
+    font-size: clamp(16px, 1.7vw, 18px);
+    color: var(--muted);
+  }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* -------------------------------------------------- 연결 다이어그램 --- */
+
+  .link-figure {
+    margin: 44px 0 8px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 18px;
+  }
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 0 0 16px;
+    overflow: hidden;
+  }
+  .node .bar {
+    display: flex; gap: 6px; align-items: center;
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .node .bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .node .body { padding: 16px 18px 0; }
+  .node .role { font-size: 12px; font-weight: 600; letter-spacing: .1em;
+                text-transform: uppercase; color: var(--accent); }
+  .node .os { margin: 4px 0 0; font-size: 19px; font-weight: 650; letter-spacing: -.01em; }
+  .node .note { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+
+  .conduit { position: relative; min-width: 170px; text-align: center; }
+  .conduit .rail {
+    position: relative; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--line), var(--accent), var(--line));
+    overflow: hidden;
+  }
+  .conduit .rail::after {
+    content: ""; position: absolute; inset: 0;
+    width: 34%;
+    background: linear-gradient(90deg, transparent, var(--accent-deep), transparent);
+    animation: flow 2.8s linear infinite;
+  }
+  @keyframes flow { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .conduit .rail::after { animation: none; opacity: .5; }
+  }
+  .conduit .label {
+    margin-top: 10px; font-size: 12.5px; color: var(--muted);
+  }
+  .conduit .label b { color: var(--ink); font-weight: 600; }
+  .conduit .struck {
+    margin-top: 4px; font-size: 12.5px; color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--warn);
+    text-decoration-thickness: 1.5px;
+  }
+  @media (max-width: 720px) {
+    .link-figure { grid-template-columns: 1fr; }
+    .conduit .rail { width: 2px; height: 56px; margin: 0 auto;
+      background: linear-gradient(180deg, var(--line), var(--accent), var(--line)); }
+    .conduit .rail::after { display: none; }
+  }
+
+  /* ---------------------------------------------------------- 섹션 --- */
+
+  section { padding: 60px 0; border-top: 1px solid var(--line); margin-top: 56px; }
+  section:first-of-type { border-top: 0; }
+  h2 {
+    margin: 0; font-size: clamp(21px, 2.6vw, 27px); font-weight: 700;
+    letter-spacing: -.018em; text-wrap: balance;
+  }
+  .sub { margin: 10px 0 0; color: var(--muted); max-width: var(--measure); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px; }
+  @media (max-width: 780px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0; font-size: 16.5px; font-weight: 650; letter-spacing: -.01em; }
+  .card p { margin: 8px 0 0; color: var(--muted); font-size: 14.5px; line-height: 1.65; }
+  .card .spec {
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 12.5px;
+  }
+
+  /* 연결 절차 — 실제로 순서가 의미를 갖는 유일한 구간이라 번호를 쓴다. */
+  ol.steps { margin: 28px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+  ol.steps li {
+    display: grid; grid-template-columns: 40px 1fr; gap: 16px;
+    padding: 18px 20px; background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  ol.steps li:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+  ol.steps li:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+  ol.steps li + li { border-top: 0; }
+  ol.steps .n {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    padding-top: 2px;
+  }
+  ol.steps h3 { margin: 0; font-size: 16px; font-weight: 650; }
+  ol.steps p { margin: 5px 0 0; color: var(--muted); font-size: 14.5px; }
+
+  .pill {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    background: var(--tint); color: var(--accent-deep);
+    font-size: 12px; font-weight: 650; letter-spacing: .01em;
+    vertical-align: 2px; margin-left: 8px;
+  }
+
+  /* 정직한 보안 고지 — 장점과 한계를 같은 무게로 둔다. */
+  .ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 28px; }
+  @media (max-width: 780px) { .ledger { grid-template-columns: 1fr; } }
+  .ledger > div {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .ledger h3 { margin: 0 0 12px; font-size: 13px; letter-spacing: .08em;
+               text-transform: uppercase; }
+  .ledger .good h3 { color: var(--accent); }
+  .ledger .limit h3 { color: var(--warn); }
+  .ledger ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; }
+  .ledger li + li { margin-top: 8px; }
+
+  table.req { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 14.5px; }
+  table.req th, table.req td {
+    text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.req th {
+    width: 130px; font-weight: 650; font-size: 12.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  table.req td { color: var(--muted); }
+  table.req td b { color: var(--ink); font-weight: 600; }
+  .scroll-x { overflow-x: auto; }
+
+  footer {
+    border-top: 1px solid var(--line); margin-top: 56px;
+    padding: 28px 0 56px; color: var(--muted); font-size: 13.5px;
+    display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline;
+  }
+  footer .sep { margin-left: auto; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, li:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px;
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="mark">▚</span> CrossDesk</div>
+    <div class="meta mono">macOS · Windows</div>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">원격 화면 공유 · 제어 · 파일 전송</div>
+    <h1>맥과 윈도우를 같은 네트워크에서 곧바로 잇습니다</h1>
+    <p class="lede">
+      한쪽에서 <strong>여섯 자리 코드</strong>를 부르면 다른 쪽이 접속합니다. 화면이 흐르고,
+      마우스와 키보드가 건너가고, 파일이 오갑니다. 계정도, 중계 서버도, 설정 파일도
+      없습니다. <strong>두 대 사이에 오직 하나의 TCP 연결</strong>만 존재합니다.
+    </p>
+
+    <div class="link-figure">
+      <div class="node">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="body">
+          <div class="role">호스트</div>
+          <p class="os">화면을 보여 주는 쪽</p>
+          <p class="note">주소 · 포트 · 코드를 표시하고 접속을 기다립니다. 제어를 허용할지는
+            체크박스 하나로 언제든 바꿉니다.</p>
+        </div>
+      </div>
+
+      <div class="conduit" aria-hidden="true">
+        <div class="rail"></div>
+        <div class="label mono"><b>TCP</b> · 포트 47820</div>
+        <div class="struck">중계 서버 · 클라우드 계정 · 로그인</div>
+      </div>
+
+      <div class="node">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="body">
+          <div class="role">뷰어</div>
+          <p class="os">화면을 보고 조작하는 쪽</p>
+          <p class="note">주소와 코드를 넣고 접속합니다. 한 번 연결한 상대는 다음부터
+            목록에서 한 번의 클릭으로 이어집니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h2>연결되면 할 수 있는 일</h2>
+    <p class="sub">세 가지가 하나의 연결 위에서 동시에 돌아갑니다. 따로 켜고 끄는 모드가 아닙니다.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>상대 화면 보기</h3>
+        <p>호스트의 주 화면을 실시간으로 받아 봅니다. 해상도가 달라도 창 크기에 맞춰
+          비율 그대로 표시됩니다.</p>
+        <p class="spec mono">초당 15프레임 · 최대 1080p · JPEG</p>
+      </div>
+      <div class="card">
+        <h3>원격으로 조작하기</h3>
+        <p>마우스 이동·클릭·스크롤과 키보드 입력이 상대 컴퓨터에 그대로 들어갑니다.
+          단축키와 한글 입력도 함께 넘어갑니다.</p>
+        <p class="spec">양쪽이 모두 켜야 동작 — 한쪽만 꺼도 즉시 차단</p>
+      </div>
+      <div class="card">
+        <h3>파일 주고받기</h3>
+        <p>양방향으로 보냅니다. 받은 파일은 자동으로 다운로드 폴더 아래
+          CrossDesk 폴더에 쌓이고, 같은 이름이 있으면 번호를 붙입니다.</p>
+        <p class="spec mono">한 개당 최대 4 GiB</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>처음 한 번만 코드, 그다음부터는 클릭 한 번</h2>
+    <p class="sub">
+      매번 코드를 부르지 않아도 됩니다. 코드로 확인된 기기에는 호스트가 인증 키를 발급하고,
+      뷰어는 그 키를 보관합니다.
+    </p>
+    <ol class="steps">
+      <li>
+        <div class="n mono">01</div>
+        <div>
+          <h3>호스트가 공유를 시작합니다</h3>
+          <p>주소와 포트, 그리고 그 자리에서 만들어진 여섯 자리 코드가 화면에 뜹니다.</p>
+        </div>
+      </li>
+      <li>
+        <div class="n mono">02</div>
+        <div>
+          <h3>뷰어가 코드로 접속합니다</h3>
+          <p>주소·포트·코드를 넣고 연결합니다. 코드 입력에는 8초의 여유가 있습니다.</p>
+        </div>
+      </li>
+      <li>
+        <div class="n mono">03</div>
+        <div>
+          <h3>호스트가 그 기기에 키를 발급합니다</h3>
+          <p>기기 이름표가 붙은 256비트 키입니다. 뷰어는 자동으로 보관합니다.</p>
+        </div>
+      </li>
+      <li>
+        <div class="n mono">04</div>
+        <div>
+          <h3>다음부터는 목록에서 바로 연결됩니다<span class="pill">코드 불필요</span></h3>
+          <p>호스트는 발급한 키 목록을 언제든 볼 수 있고, 기기 단위로 회수할 수 있습니다.
+            회수된 기기는 다시 코드를 받아야 합니다.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>윈도우의 관리자 권한 화면까지</h2>
+    <p class="sub">
+      대부분의 원격 도구가 멈추는 지점이 있습니다. 관리자 권한으로 실행된 창과 UAC 동의
+      화면은 일반 프로그램의 입력을 받지 않습니다. 앱을 관리자로 실행해도 마찬가지입니다.
+    </p>
+    <div class="cards">
+      <div class="card">
+        <h3>기본 상태</h3>
+        <p>일반 창은 모두 조작됩니다. 관리자 권한 창과 UAC 동의 창에서는 제어가 멈추고,
+          윈도우 앞에 있는 사람이 직접 눌러야 합니다.</p>
+      </div>
+      <div class="card">
+        <h3>도우미를 켠 상태<span class="pill">선택</span></h3>
+        <p>관리자 승인을 한 번 받아 배경 서비스를 등록합니다. 그 뒤로는 UAC 동의 창이
+          뷰어에 그대로 보이고, 원격에서 누를 수 있습니다.</p>
+        <p class="spec">호스트 화면에서 켜고 끄기 · 재부팅 후에도 유지</p>
+      </div>
+      <div class="card">
+        <h3>알아야 할 것</h3>
+        <p>이 기능을 켜면 원격 제어를 허용한 상대가 사실상 관리자 권한까지 쓸 수 있게
+          됩니다. 필요한 동안만 켜기를 권합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>무엇을 지키고, 무엇을 지키지 않는가</h2>
+    <p class="sub">
+      CrossDesk는 <strong>신뢰하는 네트워크</strong>를 전제로 만들어졌습니다. 감추지 않고
+      적어 둡니다.
+    </p>
+    <div class="ledger">
+      <div class="good">
+        <h3>설계상 지키는 것</h3>
+        <ul>
+          <li>화면과 파일이 제3자 서버를 지나지 않습니다. 트래픽은 두 컴퓨터 사이에만 머뭅니다.</li>
+          <li>계정이 없으므로 유출될 자격 증명도 없습니다.</li>
+          <li>제어는 양쪽이 모두 켜야 시작되고, 호스트가 끄면 그 즉시 멈춥니다.</li>
+          <li>인증 키는 기기별로 발급되고 개별 회수됩니다.</li>
+          <li>받은 파일은 정해진 폴더 밖으로 나가지 않고, 기존 파일을 덮어쓰지 않습니다.</li>
+        </ul>
+      </div>
+      <div class="limit">
+        <h3>지키지 않는 것</h3>
+        <ul>
+          <li>통신을 암호화하지 않습니다. 같은 네트워크의 도청자는 화면과 입력을 볼 수 있습니다.</li>
+          <li>코드 추측 시도에 횟수 제한이 없습니다.</li>
+          <li>인터넷을 넘는 접속은 지원하지 않습니다. 같은 네트워크에 있어야 합니다.</li>
+          <li>접속 기록을 남기지 않습니다.</li>
+        </ul>
+        <p class="sub" style="margin-top:14px; font-size:13.5px;">
+          신뢰할 수 없는 망을 거쳐야 한다면 VPN이나 SSH 터널 안에서 쓰십시오.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>필요한 것</h2>
+    <div class="scroll-x">
+      <table class="req">
+        <tr>
+          <th scope="row">운영체제</th>
+          <td><b>macOS 12.3</b> 이상 (Apple Silicon · Intel) · <b>Windows 10/11</b> 64비트</td>
+        </tr>
+        <tr>
+          <th scope="row">네트워크</th>
+          <td>두 컴퓨터가 <b>같은 공유기·같은 대역</b>에 연결. 호스트는
+            <span class="mono">47820</span> 포트로 접속을 받습니다.</td>
+        </tr>
+        <tr>
+          <th scope="row">macOS 권한</th>
+          <td>화면을 공유하려면 <b>화면 기록</b>, 원격 조작을 받으려면 <b>손쉬운 사용</b>을
+            허용합니다. 허용 후 앱을 다시 실행하세요.</td>
+        </tr>
+        <tr>
+          <th scope="row">Windows</th>
+          <td>앱 권한은 없습니다. 처음 실행할 때 뜨는 <b>방화벽 허용</b> 창에서 접속을
+            허용하면 됩니다.</td>
+        </tr>
+        <tr>
+          <th scope="row">설치</th>
+          <td>macOS는 디스크 이미지에서 응용 프로그램으로 끌어 넣고, Windows는 설치
+            프로그램을 실행합니다. 관리자 권한이 필요 없습니다.</td>
+        </tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div><span class="mark" style="color:var(--accent)">▚</span> CrossDesk</div>
+    <div class="mono">com.umaking.crossdesk</div>
+    <div class="sep">MIT 라이선스 · © umaking</div>
+  </footer>
+</div>
