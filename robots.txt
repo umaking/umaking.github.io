@@ -1,2 +1,2 @@
-User-agent: Google-adstxt
+User-agent: Googlebot
 Disallow:
